@@ -1,0 +1,334 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        
+            <script src="lib/bindings/utils.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            
+                <link href="lib/tom-select/tom-select.css" rel="stylesheet">
+                <script src="lib/tom-select/tom-select.complete.min.js"></script>
+            
+        
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossorigin="anonymous"
+        />
+        <script
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+          crossorigin="anonymous"
+        ></script>
+
+
+        <center>
+          <h1></h1>
+        </center>
+        <style type="text/css">
+
+             #mynetwork {
+                 width: 100%;
+                 height: 600px;
+                 background-color: #283044;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+             }
+
+             
+
+             
+
+             
+        </style>
+    </head>
+
+
+    <body>
+        <div class="card" style="width: 100%">
+            
+            
+              <div id="filter-menu" class="card-header">
+                <div class="row no-gutters">
+                  <div class="col-3 pb-2">
+                    <select
+                            class="form-select"
+                            aria-label="Default select example"
+                            onchange="updateFilter(value, 'item')"
+                            id="select-item"
+                        >
+                        <option value="">Select a network item</option>
+                        <option value="edge">edge</option>
+                        <option value="node">node</option>
+                    </select>
+                  </div>
+                  <div class="col-3 pb-2">
+                    <select
+                            class="form-select"
+                            aria-label="Default select example"
+                            onchange="updateFilter(value, 'property')"
+                            id="select-property"
+                        >
+                        <option value="">Select a property...</option>
+                    </select>
+                  </div>
+                  <div class="col-3 pb-2">
+                    <select
+                            class="form-select"
+                            aria-label="Default select example"
+                            id="select-value"
+                        >
+                        <option value="">Select value(s)...</option>
+                    </select>
+                  </div>
+                  <div class="col-1 pb-2">
+                    <button type="button" class="btn btn-primary btn-block" onclick="highlightFilter(filter);">Filter</button>
+                  </div>
+                  <div class="col-2 pb-2">
+                    <button type="button" class="btn btn-primary btn-block" onclick="clearFilter(true)">Reset Selection</button>
+                  </div>
+                </div>
+              </div>
+            
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+        
+        
+
+        <script type="text/javascript">
+
+              // initialize global variables.
+              var edges;
+              var nodes;
+              var allNodes;
+              var allEdges;
+              var nodeColors;
+              var originalNodes;
+              var network;
+              var container;
+              var options, data;
+              var filter = {
+                  item : '',
+                  property : '',
+                  value : []
+              };
+
+              
+
+              
+                  // explicitly using onItemAdd and this function as we need to save multiple values
+                  let updateValueFilter = function() {
+                      return function () {
+                      filter['value'].push(arguments[0])
+                      }
+                  }
+
+                  let valueControl = new TomSelect("#select-value",{
+                      maxItems: null,
+                      valueField: 'id',
+                      labelField: 'title',
+                      searchField: 'title',
+                      create: false,
+                      sortField: {
+                          field: "text",
+                          direction: "asc"
+                      },
+                      onItemAdd: updateValueFilter()
+                  });
+
+                  let addValues = function() {
+                      return function () {
+                          // clear the current value options and add the selected attribute values
+                          // tom-select handles duplicates
+                          let selectedProperty = arguments[0];
+                          valueControl.clear();
+                          valueControl.clearOptions();
+                          filter['value'] = []
+                          if (filter['item'] === 'node') {
+                              for (let each in allNodes) {
+                                  valueControl.addOption({
+                                      id:allNodes[each][selectedProperty],
+                                      title:allNodes[each][selectedProperty]
+                                  })
+                              }
+                          }
+                          else if (filter['item'] === 'edge') {
+                              for (let each in allEdges) {
+                                  valueControl.addOption({
+                                      id:allEdges[each][selectedProperty],
+                                      title:allEdges[each][selectedProperty]
+                                  })
+                              }
+                          }
+                      }
+                  };
+
+                  let propControl = new TomSelect("#select-property",{
+                      valueField: 'id',
+                      labelField: 'title',
+                      searchField: 'title',
+                      create: false,
+                      sortField: {
+                          field: "text",
+                          direction: "asc"
+                      },
+                      onItemAdd: addValues()
+                  });
+
+                  let addProperties = function() {
+                      return function () {
+                          // loops through the selected network item and adds the attributes to dropdown
+                          // tom-select handles duplicates
+                          clearFilter(false)
+                          if (arguments[0] === 'edge') {
+                              for (let each in allEdges) {
+                                  if (allEdges.hasOwnProperty(each)) {
+                                      for (let eachProp in allEdges[each]) {
+                                          if (allEdges[each].hasOwnProperty(eachProp)) {
+                                              propControl.addOption({id: eachProp, title: eachProp})
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                          else if (arguments[0] === 'node') {
+                              for (let each in allNodes) {
+                                  if (allNodes.hasOwnProperty(each)) {
+                                      for (let eachProp in allNodes[each]) {
+                                          if (allNodes[each].hasOwnProperty(eachProp)
+                                              && (eachProp !== 'hidden' && eachProp !== 'savedLabel'
+                                                  && eachProp !== 'hiddenLabel')) {
+                                              propControl.addOption({id: eachProp, title: eachProp})
+
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                      }
+                  };
+
+                  let itemControl = new TomSelect("#select-item",{
+                      create: false,
+                      sortField:{
+                          field: "text",
+                          direction: "asc"
+                      },
+                      onItemAdd: addProperties()
+                  });
+
+                  function clearFilter(reset) {
+                      // utility function to clear all the selected filter options
+                      // if reset is set to true, the existing filter will be removed
+                      // else, only the dropdown options are cleared
+                      propControl.clear();
+                      propControl.clearOptions();
+                      valueControl.clear();
+                      valueControl.clearOptions();
+                      filter = {
+                          item : '',
+                          property : '',
+                          value : []
+                      }
+                      if (reset) {
+                          itemControl.clear();
+                          filterHighlight({nodes: []})
+                      }
+                  }
+
+                  function updateFilter(value, key) {
+                      // key could be 'item' or 'property' and value is as selected in dropdown
+                      filter[key] = value
+                  }
+
+              
+
+              // This method is responsible for drawing the graph, returns the drawn network
+              function drawGraph() {
+                  var container = document.getElementById('mynetwork');
+
+                  
+
+                  // parsing and collecting nodes and edges from the python
+                  nodes = new vis.DataSet([{"color": "#6A97B4", "font": {"color": "white"}, "id": "Aja (1977)", "label": "Aja (1977)", "shape": "dot", "size": 40, "title": "Album: Aja (1977)\nArtist: Steely Dan\nLabel: ABC\nRecording Period: Late 1976 - Jul 1977\nRelease Date: September 23, 1977\nNumber of Tracks: 7\nRuntime: 0:39:56\nSingles: Peg (Nov. 1977), Deacon Blues (Mar. 1978), Josie (Aug. 1978)"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Al Schmitt", "label": "Al Schmitt", "shape": "dot", "size": 30, "title": "Al Schmitt\nNumber of albums: 3"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Bernard Purdie", "label": "Bernard Purdie", "shape": "dot", "size": 30, "title": "Bernard Purdie\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Bernie Grundman", "label": "Bernie Grundman", "shape": "dot", "size": 30, "title": "Bernie Grundman\nNumber of albums: 4"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Bill Schnee", "label": "Bill Schnee", "shape": "dot", "size": 30, "title": "Bill Schnee\nNumber of albums: 3"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Chuck Findley", "label": "Chuck Findley", "shape": "dot", "size": 30, "title": "Chuck Findley\nNumber of albums: 4"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Chuck Rainey", "label": "Chuck Rainey", "shape": "dot", "size": 30, "title": "Chuck Rainey\nNumber of albums: 3"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Clydie King", "label": "Clydie King", "shape": "dot", "size": 30, "title": "Clydie King\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Dean Parks", "label": "Dean Parks", "shape": "dot", "size": 30, "title": "Dean Parks\nNumber of albums: 4"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Don Grolnick", "label": "Don Grolnick", "shape": "dot", "size": 30, "title": "Don Grolnick\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Donald Fagen", "label": "Donald Fagen", "shape": "dot", "size": 30, "title": "Donald Fagen\nNumber of albums: 3"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Ed Greene", "label": "Ed Greene", "shape": "dot", "size": 30, "title": "Ed Greene\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Elliot Scheiner", "label": "Elliot Scheiner", "shape": "dot", "size": 30, "title": "Elliot Scheiner\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Gary Coleman", "label": "Gary Coleman", "shape": "dot", "size": 30, "title": "Gary Coleman\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Gary Katz", "label": "Gary Katz", "shape": "dot", "size": 30, "title": "Gary Katz\nNumber of albums: 3"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Jackie Kelso", "label": "Jackie Kelso", "shape": "dot", "size": 30, "title": "Jackie Kelso\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Jay Graydon", "label": "Jay Graydon", "shape": "dot", "size": 30, "title": "Jay Graydon\nNumber of albums: 3"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Jim Horn", "label": "Jim Horn", "shape": "dot", "size": 30, "title": "Jim Horn\nNumber of albums: 5"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Jim Keltner", "label": "Jim Keltner", "shape": "dot", "size": 30, "title": "Jim Keltner\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Joe Sample", "label": "Joe Sample", "shape": "dot", "size": 30, "title": "Joe Sample\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Larry Carlton", "label": "Larry Carlton", "shape": "dot", "size": 30, "title": "Larry Carlton\nNumber of albums: 4"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Lenise Bent", "label": "Lenise Bent", "shape": "dot", "size": 30, "title": "Lenise Bent\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Linda Tyler", "label": "Linda Tyler", "shape": "dot", "size": 30, "title": "Linda Tyler\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Michael McDonald", "label": "Michael McDonald", "shape": "dot", "size": 30, "title": "Michael McDonald\nNumber of albums: 6"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Michael Omartian", "label": "Michael Omartian", "shape": "dot", "size": 30, "title": "Michael Omartian\nNumber of albums: 5"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Paul Griffin", "label": "Paul Griffin", "shape": "dot", "size": 30, "title": "Paul Griffin\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Plas Johnson", "label": "Plas Johnson", "shape": "dot", "size": 30, "title": "Plas Johnson\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Rick Marotta", "label": "Rick Marotta", "shape": "dot", "size": 30, "title": "Rick Marotta\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Roger Nichols", "label": "Roger Nichols", "shape": "dot", "size": 30, "title": "Roger Nichols\nNumber of albums: 3"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Steve Gadd", "label": "Steve Gadd", "shape": "dot", "size": 30, "title": "Steve Gadd\nNumber of albums: 4"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Steve Khan", "label": "Steve Khan", "shape": "dot", "size": 30, "title": "Steve Khan\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Timothy B. Schmit", "label": "Timothy B. Schmit", "shape": "dot", "size": 30, "title": "Timothy B. Schmit\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Tom Scott", "label": "Tom Scott", "shape": "dot", "size": 30, "title": "Tom Scott\nNumber of albums: 8"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Victor Feldman", "label": "Victor Feldman", "shape": "dot", "size": 30, "title": "Victor Feldman\nNumber of albums: 3"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Walter Becker", "label": "Walter Becker", "shape": "dot", "size": 30, "title": "Walter Becker\nNumber of albums: 2"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Ambrosia (1975)", "label": "Ambrosia (1975)", "shape": "dot", "size": 40, "title": "Album: Ambrosia (1975)\nArtist: Ambrosia\nLabel: 20th Century Fox\nRecording Period: 1974\nRelease Date: February 1975\nNumber of Tracks: 8\nRuntime: 0:40:00\nSingles: Holdin\u0027 on to Yesterday, \u0027Nice, Nice, Very Nice\u0027 (both Jun. 1975)"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "James Newton Howard", "label": "James Newton Howard", "shape": "dot", "size": 30, "title": "James Newton Howard\nNumber of albums: 4"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Breakin\u0027 Away (1981)", "label": "Breakin\u0027 Away (1981)", "shape": "dot", "size": 40, "title": "Album: Breakin\u0027 Away (1981)\nArtist: Al Jarreau\nLabel: Warner Bros.\nRecording Period: 1981\nRelease Date: June 30, 1981\nNumber of Tracks: 9\nRuntime: 0:41:07\nSingles: We\u0027re in This Love Together (Jul. 1981), Breakin\u0027 Away (Unknown), Teach Me Tonight (Unknown)"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Abraham Laboriel", "label": "Abraham Laboriel", "shape": "dot", "size": 30, "title": "Abraham Laboriel\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "David Foster", "label": "David Foster", "shape": "dot", "size": 30, "title": "David Foster\nNumber of albums: 3"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Jeff Porcaro", "label": "Jeff Porcaro", "shape": "dot", "size": 30, "title": "Jeff Porcaro\nNumber of albums: 5"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Jerry Hey", "label": "Jerry Hey", "shape": "dot", "size": 30, "title": "Jerry Hey\nNumber of albums: 4"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Michael Boddicker", "label": "Michael Boddicker", "shape": "dot", "size": 30, "title": "Michael Boddicker\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Richard Page", "label": "Richard Page", "shape": "dot", "size": 30, "title": "Richard Page\nNumber of albums: 3"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Steve George", "label": "Steve George", "shape": "dot", "size": 30, "title": "Steve George\nNumber of albums: 3"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Steve Lukather", "label": "Steve Lukather", "shape": "dot", "size": 30, "title": "Steve Lukather\nNumber of albums: 5"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Can\u0027t Hold Back (1986)", "label": "Can\u0027t Hold Back (1986)", "shape": "dot", "size": 40, "title": "Album: Can\u0027t Hold Back (1986)\nArtist: Eddie Money\nLabel: Columbia\nRecording Period: 1985-1986\nRelease Date: August 8, 1986\nNumber of Tracks: 10\nRuntime: 0:40:30\nSingles: Take Me Home Tonight (1986), I Wanna Go Back (1986), Endless Nights (1987), We Should Be Sleeping (1987)"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "David Leonard", "label": "David Leonard", "shape": "dot", "size": 30, "title": "David Leonard\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Nathan East", "label": "Nathan East", "shape": "dot", "size": 30, "title": "Nathan East\nNumber of albums: 2"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Christopher Cross (1979)", "label": "Christopher Cross (1979)", "shape": "dot", "size": 40, "title": "Album: Christopher Cross (1979)\nArtist: Christopher Cross\nLabel: Warner Bros.\nRecording Period: July 1979\nRelease Date: December 27, 1979\nNumber of Tracks: 10\nRuntime: 0:38:32\nSingles: Ride Like the Wind (Feb. 15, 1980), Sailing (Jun. 15, 1980), Never Be the Same (Oct. 1980), Say You\u0027ll Be Mine (Mar. 1981)"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Bobby Hata", "label": "Bobby Hata", "shape": "dot", "size": 30, "title": "Bobby Hata\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Christopher Cross", "label": "Christopher Cross", "shape": "dot", "size": 30, "title": "Christopher Cross\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "JD Souther", "label": "JD Souther", "shape": "dot", "size": 30, "title": "JD Souther\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Lenny Castro", "label": "Lenny Castro", "shape": "dot", "size": 30, "title": "Lenny Castro\nNumber of albums: 5"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Marty McCall", "label": "Marty McCall", "shape": "dot", "size": 30, "title": "Marty McCall\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Nicolette Larson", "label": "Nicolette Larson", "shape": "dot", "size": 30, "title": "Nicolette Larson\nNumber of albums: 2"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Gaucho (1980)", "label": "Gaucho (1980)", "shape": "dot", "size": 40, "title": "Album: Gaucho (1980)\nArtist: Steely Dan\nLabel: MCA\nRecording Period: 1978-1980\nRelease Date: November 21, 1980\nNumber of Tracks: 7\nRuntime: 0:37:55\nSingles: Hey Nineteen (Nov. 21, 1980), Time Out of Mind (Mar. 1981)"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "David Sanborn", "label": "David Sanborn", "shape": "dot", "size": 30, "title": "David Sanborn\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Wayne Andre", "label": "Wayne Andre", "shape": "dot", "size": 30, "title": "Wayne Andre\nNumber of albums: 2"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "High Adventure (1982)", "label": "High Adventure (1982)", "shape": "dot", "size": 40, "title": "Album: High Adventure (1982)\nArtist: Kenny Loggins\nLabel: Columbia\nRecording Period: 1982\nRelease Date: September 1982\nNumber of Tracks: 9\nRuntime: 0:41:18\nSingles: Don\u0027t Fight It (Aug. 1982), Heart to Heart (Nov. 1982), Welcome to Heartlight (Feb. 1983)"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "David Paich", "label": "David Paich", "shape": "dot", "size": 30, "title": "David Paich\nNumber of albums: 4"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Kenny Loggins", "label": "Kenny Loggins", "shape": "dot", "size": 30, "title": "Kenny Loggins\nNumber of albums: 3"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Marty Paich", "label": "Marty Paich", "shape": "dot", "size": 30, "title": "Marty Paich\nNumber of albums: 3"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Paulinho da Costa", "label": "Paulinho da Costa", "shape": "dot", "size": 30, "title": "Paulinho da Costa\nNumber of albums: 1"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "If That\u0027s What It Takes (1982)", "label": "If That\u0027s What It Takes (1982)", "shape": "dot", "size": 40, "title": "Album: If That\u0027s What It Takes (1982)\nArtist: Michael McDonald\nLabel: Warner Bros.\nRecording Period: 1981-1982\nRelease Date: August 3, 1982\nNumber of Tracks: 10\nRuntime: 0:39:59\nSingles: I Keep Forgettin\u0027 (Every Time You\u0027re Near) (Aug. 1982), I Gotta Try (Nov. 1982), Playin\u0027 by the Rules (Feb. 1983)"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Bobby LaKind", "label": "Bobby LaKind", "shape": "dot", "size": 30, "title": "Bobby LaKind\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Brenda Russell", "label": "Brenda Russell", "shape": "dot", "size": 30, "title": "Brenda Russell\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Donn Landee", "label": "Donn Landee", "shape": "dot", "size": 30, "title": "Donn Landee\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Mike Porcaro", "label": "Mike Porcaro", "shape": "dot", "size": 30, "title": "Mike Porcaro\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Paulinho Da Costa", "label": "Paulinho Da Costa", "shape": "dot", "size": 30, "title": "Paulinho Da Costa\nNumber of albums: 1"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Ted Templeman", "label": "Ted Templeman", "shape": "dot", "size": 30, "title": "Ted Templeman\nNumber of albums: 2"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Love Will Keep Us Together (1975)", "label": "Love Will Keep Us Together (1975)", "shape": "dot", "size": 40, "title": "Album: Love Will Keep Us Together (1975)\nArtist: Captain and Tennille\nLabel: A\u0026M\nRecording Period: 1973, 1974-1975\nRelease Date: May 23, 1975\nNumber of Tracks: 11\nRuntime: 0:37:37\nSingles: Love Will Keep Us Together (1975), The Way I Want to Touch You (Sep. 1975)"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Mannequin (1978)", "label": "Mannequin (1978)", "shape": "dot", "size": 40, "title": "Album: Mannequin (1978)\nArtist: Marc Jordan\nLabel: Warner Bros.\nRecording Period: Unknown\nRelease Date: 1978\nNumber of Tracks: 10\nRuntime: 0:36:45\nSingles: None Listed"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Minute by Minute (1978)", "label": "Minute by Minute (1978)", "shape": "dot", "size": 40, "title": "Album: Minute by Minute (1978)\nArtist: The Doobie Brothers\nLabel: Warner Bros.\nRecording Period: 1978\nRelease Date: December 1, 1978\nNumber of Tracks: 10\nRuntime: 0:36:16\nSingles: What a Fool Believes/Don\u0027t Stop to Watch the Wheels (Jan. 1979), Minute by Minute/Sweet Feelin\u0027 (Apr. 25, 1979), Dependin\u0027 on You/How Do the Fools Survive? (Jul. 25, 1979)"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Bill Payne", "label": "Bill Payne", "shape": "dot", "size": 30, "title": "Bill Payne\nNumber of albums: 2"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Nights Are Forever (1976)", "label": "Nights Are Forever (1976)", "shape": "dot", "size": 40, "title": "Album: Nights Are Forever (1976)\nArtist: England Dan \u0026 John Ford Coley\nLabel: Big Tree\nRecording Period: 1976\nRelease Date: July 1976\nNumber of Tracks: 11\nRuntime: 0:34:41\nSingles: I\u0027d Really Love to See You Tonight (May 1976), Nights Are Forever Without You (Oct. 1976) "}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Glenn Meadows", "label": "Glenn Meadows", "shape": "dot", "size": 30, "title": "Glenn Meadows\nNumber of albums: 2"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "No Secrets (1972)", "label": "No Secrets (1972)", "shape": "dot", "size": 40, "title": "Album: No Secrets (1972)\nArtist: Carly Simon\nLabel: Elektra\nRecording Period: September - October 1972\nRelease Date: November 28, 1972\nNumber of Tracks: 10\nRuntime: 0:35:58\nSingles: You\u0027re So Vain (Nov. 8, 1972), The Right Thing to Do (Mar. 1973) "}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Andy Newmark", "label": "Andy Newmark", "shape": "dot", "size": 30, "title": "Andy Newmark\nNumber of albums: 2"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Partners in Crime (1979)", "label": "Partners in Crime (1979)", "shape": "dot", "size": 40, "title": "Album: Partners in Crime (1979)\nArtist: Rupert Holmes\nLabel: Infinity, MCA\nRecording Period: January - July 1979\nRelease Date: August 5, 1979\nNumber of Tracks: 10\nRuntime: 0:42:40\nSingles: Escape (The Pina Colada Song) (Sep. 17, 1979), Him (Jan. 7, 1980), Answering Machine (1980)"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Phoenix (1979)", "label": "Phoenix (1979)", "shape": "dot", "size": 40, "title": "Album: Phoenix (1979)\nArtist: Dan Fogelberg\nLabel: Full Moon, Epic\nRecording Period: November 1978 - October 1979\nRelease Date: November 1979\nNumber of Tracks: 10\nRuntime: 0:42:56\nSingles: Face the Fire (1979), Longer (1979), Beggar\u0027s Game (1980), Heart Hotels (1980)"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Sid Sharp", "label": "Sid Sharp", "shape": "dot", "size": 30, "title": "Sid Sharp\nNumber of albums: 2"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Player (1977)", "label": "Player (1977)", "shape": "dot", "size": 40, "title": "Album: Player (1977)\nArtist: Player\nLabel: RSO\nRecording Period: 1977\nRelease Date: September 1, 1977\nNumber of Tracks: 10\nRuntime: 0:39:56\nSingles: Baby Come Back (Oct. 13, 1977), This Time I\u0027m in It for Love (Mar. 1978)"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Silk Degrees (1976)", "label": "Silk Degrees (1976)", "shape": "dot", "size": 40, "title": "Album: Silk Degrees (1976)\nArtist: Boz Scaggs\nLabel: Columbia\nRecording Period: September - October 1975\nRelease Date: February 18, 1976\nNumber of Tracks: 10\nRuntime: 0:41:32\nSingles: It\u0027s Over (1976), Lowdown (Jun. 1976), Lido Shuffle (Feb. 1977), What Can I Say (1977)"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "David Hungate", "label": "David Hungate", "shape": "dot", "size": 30, "title": "David Hungate\nNumber of albums: 2"}, {"color": "#FE5F55", "font": {"color": "white"}, "id": "Joe Porcaro", "label": "Joe Porcaro", "shape": "dot", "size": 30, "title": "Joe Porcaro\nNumber of albums: 2"}, {"color": "#6A97B4", "font": {"color": "white"}, "id": "Toto IV (1982)", "label": "Toto IV (1982)", "shape": "dot", "size": 40, "title": "Album: Toto IV (1982)\nArtist: Toto\nLabel: Columbia\nRecording Period: June 1981 - January 1982\nRelease Date: April 8, 1982\nNumber of Tracks: 10\nRuntime: 0:41:58\nSingles: Rosanna (Mar. 31, 1982), Africa (Oct. 1982), Make Believe (Jul. 1982), Afraid of Love (1982), I Won\u0027t Hold You Back (Mar. 1983), Waiting for Your Love (Jun. 1983)"}]);
+                  edges = new vis.DataSet([{"color": "#FFFBDB", "from": "Aja (1977)", "title": "Engineer", "to": "Al Schmitt", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Drums", "to": "Bernard Purdie", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Mastering Engineer", "to": "Bernie Grundman", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Engineer", "to": "Bill Schnee", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Brass", "to": "Chuck Findley", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Bass Guitar", "to": "Chuck Rainey", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Backing Vocals", "to": "Clydie King", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Guitar, Rhythm Arrangments", "to": "Dean Parks", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Clavinet", "to": "Don Grolnick", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Lead Vocals, Synthesizer, Backing Vocals, Rhythm Arrangements, Writer", "to": "Donald Fagen", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Drums", "to": "Ed Greene", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Engineer", "to": "Elliot Scheiner", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Percussion", "to": "Gary Coleman", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Producer", "to": "Gary Katz", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Saxophone, Flute", "to": "Jackie Kelso", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Guitar Solo", "to": "Jay Graydon", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Rhythm Arrangements", "to": "Jim Horn", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Percussion, Drums", "to": "Jim Keltner", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Clavinet, Rhodes Piano", "to": "Joe Sample", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Guitar, Rhythm Arrangments", "to": "Larry Carlton", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Assistant Engineer", "to": "Lenise Bent", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Assistant Engineer", "to": "Linda Tyler", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Backing Vocals", "to": "Michael McDonald", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Piano, Rhythm Arrangements", "to": "Michael Omartian", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Rhodes Piano, Backing Vocals", "to": "Paul Griffin", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Saxophone, Flute", "to": "Plas Johnson", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Drums", "to": "Rick Marotta", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Executive Engineer", "to": "Roger Nichols", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Drums", "to": "Steve Gadd", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Guitar", "to": "Steve Khan", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Backing Vocals", "to": "Timothy B. Schmit", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Horn Arrangement, Horn Conducting, Saxophone, Flute, Lyricon", "to": "Tom Scott", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Rhodes Piano, Percussion, Marimba, Vibraphone", "to": "Victor Feldman", "width": 1}, {"color": "#FFFBDB", "from": "Aja (1977)", "title": "Guitar, Bass Guitar, Rhythm Arrangements, Writer", "to": "Walter Becker", "width": 1}, {"color": "#FFFBDB", "from": "Al Schmitt", "title": "Engineer", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Al Schmitt", "title": "Engineer", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Bernard Purdie", "title": "Drums", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Bernie Grundman", "title": "Mastering Engineer", "to": "Can\u0027t Hold Back (1986)", "width": 1}, {"color": "#FFFBDB", "from": "Bernie Grundman", "title": "Mastering Engineer", "to": "High Adventure (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Bernie Grundman", "title": "Mastering Engineer", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Bill Schnee", "title": "Tracking Engineer", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Bill Schnee", "title": "Engineer, Remixing", "to": "No Secrets (1972)", "width": 1}, {"color": "#FFFBDB", "from": "Chuck Findley", "title": "Trumpet", "to": "Breakin\u0027 Away (1981)", "width": 1}, {"color": "#FFFBDB", "from": "Chuck Findley", "title": "Trumpet, Flugelhorn", "to": "Christopher Cross (1979)", "width": 1}, {"color": "#FFFBDB", "from": "Chuck Findley", "title": "Flugelhorn", "to": "Silk Degrees (1976)", "width": 1}, {"color": "#FFFBDB", "from": "Chuck Rainey", "title": "Bass Guitar", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Chuck Rainey", "title": "Bass", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Clydie King", "title": "Backing Vocals", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Dean Parks", "title": "Electric Guitar", "to": "Breakin\u0027 Away (1981)", "width": 1}, {"color": "#FFFBDB", "from": "Dean Parks", "title": "Guitar", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Dean Parks", "title": "Guitar", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Don Grolnick", "title": "Electric Piano, Clavinet, Rhythm Arrangements", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Donald Fagen", "title": "Writer, Lead Vocals, Electric Piano, Synthesizer, Organ", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Donald Fagen", "title": "Keyboard", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Ed Greene", "title": "Drums", "to": "Love Will Keep Us Together (1975)", "width": 1}, {"color": "#FFFBDB", "from": "Elliot Scheiner", "title": "Tracking Engineer, Mixdown Engineer", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Gary Coleman", "title": "Percussion", "to": "Player (1977)", "width": 1}, {"color": "#FFFBDB", "from": "Gary Katz", "title": "Producer", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Gary Katz", "title": "Producer", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Jackie Kelso", "title": "Saxophone", "to": "Christopher Cross (1979)", "width": 1}, {"color": "#FFFBDB", "from": "Jay Graydon", "title": "Synthesizer Programming, Electric Guitar, Rhythm Arrangements, Vocal Arrangements, Producer, Mixing", "to": "Breakin\u0027 Away (1981)", "width": 1}, {"color": "#FFFBDB", "from": "Jay Graydon", "title": "Guitar", "to": "Christopher Cross (1979)", "width": 1}, {"color": "#FFFBDB", "from": "Jim Horn", "title": "Saxophone", "to": "Christopher Cross (1979)", "width": 1}, {"color": "#FFFBDB", "from": "Jim Horn", "title": "Saxophone, Flute", "to": "Player (1977)", "width": 1}, {"color": "#FFFBDB", "from": "Jim Horn", "title": "Tenor Saxophone, Horns", "to": "Silk Degrees (1976)", "width": 1}, {"color": "#FFFBDB", "from": "Jim Horn", "title": "Saxophone, Recorder", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Jim Keltner", "title": "Drums", "to": "No Secrets (1972)", "width": 1}, {"color": "#FFFBDB", "from": "Joe Sample", "title": "Electric Piano", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Larry Carlton", "title": "Guitar", "to": "Christopher Cross (1979)", "width": 1}, {"color": "#FFFBDB", "from": "Larry Carlton", "title": "Guitar", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Larry Carlton", "title": "Guitar", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Lenise Bent", "title": "Assistant Engineer", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Linda Tyler", "title": "Assistant Engineer", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Michael McDonald", "title": "Backing Vocals", "to": "Christopher Cross (1979)", "width": 1}, {"color": "#FFFBDB", "from": "Michael McDonald", "title": "Backing Vocals", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Michael McDonald", "title": "Keyboards, Rhodes piano, Synthesizer Programming, Acoustic Piano", "to": "High Adventure (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Michael McDonald", "title": "Writer, Lead Vocals, Backing Vocals, Rhodes Piano, Synthesizers, Acoustic Piano", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Michael McDonald", "title": "Writer, Leading Vocals, Backing Vocals, Piano, Electric Piano, Organ, Synthesizers", "to": "Minute by Minute (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Michael Omartian", "title": "Synthesizers, Rhodes Piano", "to": "Breakin\u0027 Away (1981)", "width": 1}, {"color": "#FFFBDB", "from": "Michael Omartian", "title": "Acoustic Piano, Synthesizers, Backing Vocals, Producer", "to": "Christopher Cross (1979)", "width": 1}, {"color": "#FFFBDB", "from": "Michael Omartian", "title": "Rhodes Piano", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Michael Omartian", "title": "Synthesizers", "to": "Player (1977)", "width": 1}, {"color": "#FFFBDB", "from": "Paul Griffin", "title": "Keyboard", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Plas Johnson", "title": "Tenor Saxophone, Horns", "to": "Silk Degrees (1976)", "width": 1}, {"color": "#FFFBDB", "from": "Rick Marotta", "title": "Drums", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Roger Nichols", "title": "Executive Engineer, Overdub Engineer, Sequencing and Special Effects", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Roger Nichols", "title": "Engineer", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Steve Gadd", "title": "Drums", "to": "Breakin\u0027 Away (1981)", "width": 1}, {"color": "#FFFBDB", "from": "Steve Gadd", "title": "Percussion, Drums", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Steve Gadd", "title": "Drums", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Steve Khan", "title": "Acoustic Guitar, Electric Guitar", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Timothy B. Schmit", "title": "Backing Vocals", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Tom Scott", "title": "Horns", "to": "Breakin\u0027 Away (1981)", "width": 1}, {"color": "#FFFBDB", "from": "Tom Scott", "title": "Tenor Saxophone, Alto Saxophone, Clarinet, Lyricon, Horn Arrangement", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Tom Scott", "title": "Saxophone, Lyricon", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Tom Scott", "title": "Tenor Saxophone", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Tom Scott", "title": "Saxophone, Lyricon", "to": "Phoenix (1979)", "width": 1}, {"color": "#FFFBDB", "from": "Tom Scott", "title": "Horns", "to": "Silk Degrees (1976)", "width": 1}, {"color": "#FFFBDB", "from": "Tom Scott", "title": "Saxophone", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Victor Feldman", "title": "Vibraphone, Percussion", "to": "Christopher Cross (1979)", "width": 1}, {"color": "#FFFBDB", "from": "Victor Feldman", "title": "Percussion", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Walter Becker", "title": "Writer", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Ambrosia (1975)", "title": "Synthesizer Programming", "to": "James Newton Howard", "width": 1}, {"color": "#FFFBDB", "from": "James Newton Howard", "title": "Synthesizers, String Arrangements, Acoustic Piano", "to": "High Adventure (1982)", "width": 1}, {"color": "#FFFBDB", "from": "James Newton Howard", "title": "Keyboard", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "James Newton Howard", "title": "Conductor, Orchestral Arrangements", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Breakin\u0027 Away (1981)", "title": "Bass Guitar", "to": "Abraham Laboriel", "width": 1}, {"color": "#FFFBDB", "from": "Breakin\u0027 Away (1981)", "title": "Acoustic Piano, Rhodes Piano, Synthesizers, String Arrangements", "to": "David Foster", "width": 1}, {"color": "#FFFBDB", "from": "Breakin\u0027 Away (1981)", "title": "Drums", "to": "Jeff Porcaro", "width": 1}, {"color": "#FFFBDB", "from": "Breakin\u0027 Away (1981)", "title": "Flugelhorn, Trumpet, Horn Arrangements", "to": "Jerry Hey", "width": 1}, {"color": "#FFFBDB", "from": "Breakin\u0027 Away (1981)", "title": "Synthesizer Programming, Synthesizers", "to": "Michael Boddicker", "width": 1}, {"color": "#FFFBDB", "from": "Breakin\u0027 Away (1981)", "title": "Backing Vocals", "to": "Richard Page", "width": 1}, {"color": "#FFFBDB", "from": "Breakin\u0027 Away (1981)", "title": "Backing Vocals", "to": "Steve George", "width": 1}, {"color": "#FFFBDB", "from": "Breakin\u0027 Away (1981)", "title": "Electric Guitar", "to": "Steve Lukather", "width": 1}, {"color": "#FFFBDB", "from": "Abraham Laboriel", "title": "Bass", "to": "High Adventure (1982)", "width": 1}, {"color": "#FFFBDB", "from": "David Foster", "title": "Grand Piano, String Arrangements", "to": "High Adventure (1982)", "width": 1}, {"color": "#FFFBDB", "from": "David Foster", "title": "Keyboard", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Jeff Porcaro", "title": "Drums", "to": "Gaucho (1980)", "width": 1}, {"color": "#FFFBDB", "from": "Jeff Porcaro", "title": "Drums", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Jeff Porcaro", "title": "Drums, Percussion, Timbales", "to": "Silk Degrees (1976)", "width": 1}, {"color": "#FFFBDB", "from": "Jeff Porcaro", "title": "Writer", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Jerry Hey", "title": "Horn Arrangements", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Jerry Hey", "title": "Flugelhorn", "to": "Phoenix (1979)", "width": 1}, {"color": "#FFFBDB", "from": "Jerry Hey", "title": "Trumpet, Horn Arrangements", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Michael Boddicker", "title": "Additional Synthesizers", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Richard Page", "title": "Backing Vocals", "to": "Can\u0027t Hold Back (1986)", "width": 1}, {"color": "#FFFBDB", "from": "Richard Page", "title": "Backing Vocals", "to": "High Adventure (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Steve George", "title": "Keyboards, Backing Vocals", "to": "Can\u0027t Hold Back (1986)", "width": 1}, {"color": "#FFFBDB", "from": "Steve George", "title": "Backing Vocals", "to": "High Adventure (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Steve Lukather", "title": "Guitar", "to": "High Adventure (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Steve Lukather", "title": "Guitar", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Steve Lukather", "title": "Guitar", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Steve Lukather", "title": "Writer, Guitar, Lead Vocals, Backing Vocals, Piano", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Can\u0027t Hold Back (1986)", "title": "Engineer", "to": "David Leonard", "width": 1}, {"color": "#FFFBDB", "from": "Can\u0027t Hold Back (1986)", "title": "Bass Guitar", "to": "Nathan East", "width": 1}, {"color": "#FFFBDB", "from": "David Leonard", "title": "Engineer", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Nathan East", "title": "Bass", "to": "High Adventure (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Christopher Cross (1979)", "title": "Mastering", "to": "Bobby Hata", "width": 1}, {"color": "#FFFBDB", "from": "Christopher Cross (1979)", "title": "Writer, Lead Vocals, Electric Guitar, Acoustic Guitar, Backing Vocals", "to": "Christopher Cross", "width": 1}, {"color": "#FFFBDB", "from": "Christopher Cross (1979)", "title": "Backing Vocals", "to": "JD Souther", "width": 1}, {"color": "#FFFBDB", "from": "Christopher Cross (1979)", "title": "Percussion", "to": "Lenny Castro", "width": 1}, {"color": "#FFFBDB", "from": "Christopher Cross (1979)", "title": "Backing Vocals", "to": "Marty McCall", "width": 1}, {"color": "#FFFBDB", "from": "Christopher Cross (1979)", "title": "Backing Vocals", "to": "Nicolette Larson", "width": 1}, {"color": "#FFFBDB", "from": "Bobby Hata", "title": "Master Engineer", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Christopher Cross", "title": "Backing Vocals", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "JD Souther", "title": "Backing Vocals", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Lenny Castro", "title": "Percussion", "to": "High Adventure (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Lenny Castro", "title": "Percussion", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Lenny Castro", "title": "Percussion", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Lenny Castro", "title": "Congas, Percussion", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Marty McCall", "title": "Backing Vocals", "to": "Silk Degrees (1976)", "width": 1}, {"color": "#FFFBDB", "from": "Nicolette Larson", "title": "Vocals", "to": "Minute by Minute (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Gaucho (1980)", "title": "Alto Saxophone", "to": "David Sanborn", "width": 1}, {"color": "#FFFBDB", "from": "Gaucho (1980)", "title": "Trombone", "to": "Wayne Andre", "width": 1}, {"color": "#FFFBDB", "from": "David Sanborn", "title": "Alto Saxophone", "to": "High Adventure (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Wayne Andre", "title": "Trombone", "to": "Partners in Crime (1979)", "width": 1}, {"color": "#FFFBDB", "from": "High Adventure (1982)", "title": "String Arrangements", "to": "David Paich", "width": 1}, {"color": "#FFFBDB", "from": "High Adventure (1982)", "title": "Lead Vocals, Rhythm Guitar, Synthesizers, Producer, Writer", "to": "Kenny Loggins", "width": 1}, {"color": "#FFFBDB", "from": "High Adventure (1982)", "title": "String Arrangements", "to": "Marty Paich", "width": 1}, {"color": "#FFFBDB", "from": "High Adventure (1982)", "title": "Congas", "to": "Paulinho da Costa", "width": 1}, {"color": "#FFFBDB", "from": "David Paich", "title": "Keyboard", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "David Paich", "title": "Writer, Arrangements, Acoustic Piano, Clavinet, Rhodes Piano, Synthesizers, Organ, Electric Piano, Harpsichord", "to": "Silk Degrees (1976)", "width": 1}, {"color": "#FFFBDB", "from": "David Paich", "title": "Writer", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Kenny Loggins", "title": "Backing Vocals", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Kenny Loggins", "title": "Writer", "to": "Minute by Minute (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Marty Paich", "title": "String Arrangements", "to": "If That\u0027s What It Takes (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Marty Paich", "title": "Orchestral Arrangements", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "If That\u0027s What It Takes (1982)", "title": "Percussion", "to": "Bobby LaKind", "width": 1}, {"color": "#FFFBDB", "from": "If That\u0027s What It Takes (1982)", "title": "Backing Vocals", "to": "Brenda Russell", "width": 1}, {"color": "#FFFBDB", "from": "If That\u0027s What It Takes (1982)", "title": "Engineer, Overdub Engineer", "to": "Donn Landee", "width": 1}, {"color": "#FFFBDB", "from": "If That\u0027s What It Takes (1982)", "title": "Bass", "to": "Mike Porcaro", "width": 1}, {"color": "#FFFBDB", "from": "If That\u0027s What It Takes (1982)", "title": "Percussion", "to": "Paulinho Da Costa", "width": 1}, {"color": "#FFFBDB", "from": "If That\u0027s What It Takes (1982)", "title": "Producer, Percussion", "to": "Ted Templeman", "width": 1}, {"color": "#FFFBDB", "from": "Bobby LaKind", "title": "Congas, Backing Vocals", "to": "Minute by Minute (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Brenda Russell", "title": "Backing Vocals", "to": "Mannequin (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Donn Landee", "title": "Engineer", "to": "Minute by Minute (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Mike Porcaro", "title": "Cello", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Ted Templeman", "title": "Writer, Producer, Drums, Percussion", "to": "Minute by Minute (1978)", "width": 1}, {"color": "#FFFBDB", "from": "Minute by Minute (1978)", "title": "Synthesizer", "to": "Bill Payne", "width": 1}, {"color": "#FFFBDB", "from": "Bill Payne", "title": "Organ", "to": "No Secrets (1972)", "width": 1}, {"color": "#FFFBDB", "from": "Nights Are Forever (1976)", "title": "Mastering Engineer", "to": "Glenn Meadows", "width": 1}, {"color": "#FFFBDB", "from": "Glenn Meadows", "title": "Mastering Engineer", "to": "Phoenix (1979)", "width": 1}, {"color": "#FFFBDB", "from": "No Secrets (1972)", "title": "Drums", "to": "Andy Newmark", "width": 1}, {"color": "#FFFBDB", "from": "Andy Newmark", "title": "Drums", "to": "Phoenix (1979)", "width": 1}, {"color": "#FFFBDB", "from": "Phoenix (1979)", "title": "Concertmaster", "to": "Sid Sharp", "width": 1}, {"color": "#FFFBDB", "from": "Sid Sharp", "title": "String Conductor, Concertmaster", "to": "Silk Degrees (1976)", "width": 1}, {"color": "#FFFBDB", "from": "Silk Degrees (1976)", "title": "Bass", "to": "David Hungate", "width": 1}, {"color": "#FFFBDB", "from": "Silk Degrees (1976)", "title": "Percussion", "to": "Joe Porcaro", "width": 1}, {"color": "#FFFBDB", "from": "David Hungate", "title": "Bass Guitar", "to": "Toto IV (1982)", "width": 1}, {"color": "#FFFBDB", "from": "Joe Porcaro", "title": "Percussion, Xylophone, Tympani, Marimba", "to": "Toto IV (1982)", "width": 1}]);
+
+                  nodeColors = {};
+                  allNodes = nodes.get({ returnType: "Object" });
+                  for (nodeId in allNodes) {
+                    nodeColors[nodeId] = allNodes[nodeId].color;
+                  }
+                  allEdges = edges.get({ returnType: "Object" });
+                  // adding nodes and edges to the graph
+                  data = {nodes: nodes, edges: edges};
+
+                  var options = {
+    "configure": {
+        "enabled": false
+    },
+    "edges": {
+        "color": {
+            "inherit": true
+        },
+        "smooth": {
+            "enabled": true,
+            "type": "dynamic"
+        }
+    },
+    "interaction": {
+        "dragNodes": true,
+        "hideEdgesOnDrag": false,
+        "hideNodesOnDrag": false
+    },
+    "physics": {
+        "barnesHut": {
+            "avoidOverlap": 0,
+            "centralGravity": 0.2,
+            "damping": 0.9,
+            "gravitationalConstant": -30000,
+            "springConstant": 0.05,
+            "springLength": 200
+        },
+        "enabled": true,
+        "stabilization": {
+            "enabled": true,
+            "fit": true,
+            "iterations": 1000,
+            "onlyDynamicEdges": false,
+            "updateInterval": 50
+        }
+    }
+};
+
+                  
+
+
+                  
+
+                  network = new vis.Network(container, data, options);
+
+                  
+
+                  
+
+                  
+
+
+                  
+
+                  return network;
+
+              }
+              drawGraph();
+        </script>
+    </body>
+</html>
